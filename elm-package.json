@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "summary": "Helpers for working with DNN Localization",
-    "repository": "https://github.com/engagesoftware/elm-dnn-localization.git",
+    "repository": "https://github.com/EngageSoftware/elm-dnn-localization.git",
     "license": "Apache 2.0",
     "source-directories": [
         "src"
