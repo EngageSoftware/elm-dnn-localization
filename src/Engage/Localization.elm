@@ -30,10 +30,18 @@ module Engage.Localization
 import Dict exposing (Dict)
 import Html exposing (Html, text)
 import Json.Decode as Decode exposing (Decoder)
-import Json.Decode.Pipeline as Decode exposing (decode, required)
-import Maybe.Extra exposing (or)
+import Json.Decode.Pipeline as Decode exposing (required)
 import String exposing (toUpper)
 
+
+orElse : Maybe a -> Maybe a -> Maybe a
+orElse ma mb =
+    case mb of
+        Nothing ->
+            ma
+
+        Just _ ->
+            mb
 
 type alias KeyValue =
     { key : String, value : String }
@@ -73,8 +81,8 @@ localizeStringWithDefault default key model =
             toUpper key
     in
     Dict.get keyUppercase model.localization
-        |> flip or (Dict.get (keyUppercase ++ ".TEXT") model.localization)
-        |> flip or (Dict.get (keyUppercase ++ ".ERROR") model.localization)
+        |> orElse (Dict.get (keyUppercase ++ ".TEXT") model.localization)
+        |> orElse (Dict.get (keyUppercase ++ ".ERROR") model.localization)
         |> Maybe.withDefault default
 
 
@@ -111,18 +119,9 @@ keyValuesToLocalization keyValues =
         |> Dict.fromList
 
 
-toLocalization : { options | localization : List KeyValue } -> { options | localization : Localization }
-toLocalization jsOptions =
-    let
-        keyValues =
-            jsOptions.localization
-    in
-    { jsOptions | localization = keyValuesToLocalization keyValues }
-
-
 keyValueDecoder : Decoder KeyValue
 keyValueDecoder =
-    decode KeyValue
+    Decode.succeed KeyValue
         |> required "key" Decode.string
         |> required "value" Decode.string
 
