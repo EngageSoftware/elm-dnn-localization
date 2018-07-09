@@ -3,7 +3,7 @@
     "name": "EngageSoftware/elm-dnn-localization",
     "summary": "Helpers for working with DNN Localization",
     "license": "Apache-2.0",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "exposed-modules": [
         "Engage.Localization"
     ],
