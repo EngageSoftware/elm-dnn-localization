@@ -1,12 +1,13 @@
 module Tests exposing (suite)
 
-import Dict
+import Dict exposing (Dict)
 import Engage.Localization as Localization
 import Expect
 import Fuzz exposing (Fuzzer)
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Set
+import List.Extra
+import Result.Extra
 import Test exposing (Test, describe, fuzz, test)
 
 
@@ -21,45 +22,80 @@ suite =
                         |> Expect.equal (Ok Dict.empty)
             , fuzz entriesFuzzer "Decode entries" <|
                 \entries ->
-                    Debug.log "entries" entries
-                        |> encodeEntries
-                        |> Decode.decodeValue Localization.decoder
-                        |> Result.map Dict.toList
-                        |> Result.map Set.fromList
-                        |> Result.map (Set.diff (Set.fromList entries))
-                        |> Result.map (Expect.equalSets Set.empty)
-                        |> Result.mapError Decode.errorToString
-                        |> Result.mapError Expect.fail
-                        |> merge
-                        |> Debug.log "expectation"
+                    localizationTest entries
+                        (localizeEntries entries)
+                        (Expect.equalDicts (Dict.fromList entries))
+            ]
+        , describe "localizeString"
+            [ localizationModelTest "Missing key defaults to brackets"
+                []
+                (Localization.localizeString "foobar")
+                (Expect.equal "[foobar]")
+            , localizationModelTest "Key matches without .Text suffix"
+                [ ( "foo", "bar" ) ]
+                (Localization.localizeString "foo")
+                (Expect.equal "bar")
+            , localizationModelTest "Key match is case insensitive"
+                [ ( "foo", "bar" ) ]
+                (Localization.localizeString "Foo")
+                (Expect.equal "bar")
             ]
         ]
 
 
+localizationTest entries getValue expectation =
+    entries
+        |> encodeEntries
+        |> Decode.decodeValue Localization.decoder
+        |> Result.map getValue
+        |> Result.map expectation
+        |> Result.mapError Decode.errorToString
+        |> Result.mapError Expect.fail
+        |> Result.Extra.merge
+
+
+localizationModelTest description entries getValue expectation =
+    test description <|
+        \_ ->
+            localizationTest
+                entries
+                (\localization -> getValue { localization = localization })
+                expectation
+
+
+localizeEntries : List ( String, String ) -> Localization.Localization -> Dict String String
+localizeEntries entries localization =
+    let
+        model =
+            { localization = localization }
+    in
+    entries
+        |> List.map Tuple.first
+        |> List.map (\key -> ( key, Localization.localizeString key model ))
+        |> Dict.fromList
+
+
 encodeEntries : List ( String, String ) -> Encode.Value
 encodeEntries entries =
+    let
+        encodeEntry ( key, value ) =
+            Encode.object [ ( "key", Encode.string key ), ( "value", Encode.string value ) ]
+    in
     entries
         |> Encode.list encodeEntry
-
-encodeEntry ( key, value ) =
-    Encode.object [ ( "key", Encode.string key ), ( "value", Encode.string value ) ]
 
 
 entriesFuzzer : Fuzzer (List ( String, String ))
 entriesFuzzer =
-    Fuzz.list entryFuzzer
+    let
+        entryFuzzer =
+            Fuzz.tuple ( Fuzz.string, Fuzz.string )
 
-
-entryFuzzer : Fuzzer ( String, String )
-entryFuzzer =
-    Fuzz.tuple ( Fuzz.string, Fuzz.string )
-
--- from https://github.com/elm-community/result-extra/blob/b59230b2670b19210d8e06ae48463f8fe3432e8f/src/Result/Extra.elm#L222-L248
-merge : Result a a -> a
-merge r =
-    case r of
-        Ok rr ->
-            rr
-
-        Err rr ->
-            rr
+        removeDuplicates entries =
+            entries
+                |> List.Extra.gatherEqualsBy (Tuple.first >> String.toUpper)
+                |> List.map Tuple.first
+    in
+    entryFuzzer
+        |> Fuzz.list
+        |> Fuzz.map removeDuplicates
