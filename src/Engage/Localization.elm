@@ -24,14 +24,9 @@ module Engage.Localization exposing
 -}
 
 import Dict exposing (Dict)
-import Html exposing (Html, text)
-import Json.Decode as Decode exposing (Decoder, succeed)
-import Json.Decode.Pipeline as Decode exposing (required)
-import String exposing (toUpper)
-
-
-type alias KeyValue =
-    { key : String, value : String }
+import Html exposing (Html)
+import Json.Decode as Decode exposing (Decoder)
+import Maybe.Extra
 
 
 {-| `Dict` for storing Localization text
@@ -65,11 +60,11 @@ localizeStringWithDefault : String -> String -> { a | localization : Localizatio
 localizeStringWithDefault default key model =
     let
         keyUppercase =
-            toUpper key
+            String.toUpper key
     in
     Dict.get keyUppercase model.localization
-        |> orElse (Dict.get (keyUppercase ++ ".TEXT") model.localization)
-        |> orElse (Dict.get (keyUppercase ++ ".ERROR") model.localization)
+        |> Maybe.Extra.orElse (Dict.get (keyUppercase ++ ".TEXT") model.localization)
+        |> Maybe.Extra.orElse (Dict.get (keyUppercase ++ ".ERROR") model.localization)
         |> Maybe.withDefault default
 
 
@@ -96,21 +91,21 @@ localizeText key =
 -}
 localizeTextWithDefault : String -> String -> { a | localization : Localization } -> Html msg
 localizeTextWithDefault default key model =
-    text (localizeStringWithDefault default key model)
+    Html.text (localizeStringWithDefault default key model)
 
 
-keyValuesToLocalization : List KeyValue -> Localization
+keyValuesToLocalization : List ( String, String ) -> Localization
 keyValuesToLocalization keyValues =
     keyValues
-        |> List.map (\keyValue -> ( toUpper keyValue.key, keyValue.value ))
+        |> List.map (\( key, value ) -> ( String.toUpper key, value ))
         |> Dict.fromList
 
 
-keyValueDecoder : Decoder KeyValue
+keyValueDecoder : Decoder ( String, String )
 keyValueDecoder =
-    succeed KeyValue
-        |> required "key" Decode.string
-        |> required "value" Decode.string
+    Decode.map2 (\key value -> ( key, value ))
+        (Decode.field "key" Decode.string)
+        (Decode.field "value" Decode.string)
 
 
 {-| Decode from JSON values that contains an array of object with `key` and `value` string properties to a `Localization`
@@ -119,17 +114,3 @@ decoder : Decoder Localization
 decoder =
     Decode.list keyValueDecoder
         |> Decode.map keyValuesToLocalization
-
-
-
--- from https://github.com/elm-community/maybe-extra/blob/d669ca3117a7ce9824a68cb54668c9e1d6905cf2/src/Maybe/Extra.elm#L228-L249
-
-
-orElse : Maybe a -> Maybe a -> Maybe a
-orElse ma mb =
-    case mb of
-        Nothing ->
-            ma
-
-        Just _ ->
-            mb
