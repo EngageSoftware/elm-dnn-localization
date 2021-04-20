@@ -1,0 +1,4 @@
+{
+  "root": "../src",
+  "tests": ["Engage.Localization", "README.md"]
+}
