@@ -63,6 +63,34 @@ suite =
                         (localizeEntries entries)
                         (Expect.equalLists entries)
             ]
+        , describe "fromDict"
+            [ test "Empty dict is empty" <|
+                \_ ->
+                    Dict.empty
+                        |> Localization.fromDict
+                        |> Expect.equalDicts Dict.empty
+            , test "Empty dict does not match value" <|
+                \_ ->
+                    Dict.empty
+                        |> Localization.fromDict
+                        |> Model
+                        |> Localization.localizeStringWithDefault "Not Found" "Name.Text"
+                        |> Expect.equal "Not Found"
+            , test "Can retrieve value from dict without matching case" <|
+                \_ ->
+                    Dict.fromList [ ( "Name.Text", "The Name" ) ]
+                        |> Localization.fromDict
+                        |> Model
+                        |> Localization.localizeStringWithDefault "Not Found" "name.text"
+                        |> Expect.equal "The Name"
+            , test "Can retrieve value from dict without matching .Text suffix" <|
+                \_ ->
+                    Dict.fromList [ ( "Name.Text", "The Name" ) ]
+                        |> Localization.fromDict
+                        |> Model
+                        |> Localization.localizeStringWithDefault "Not Found" "Name"
+                        |> Expect.equal "The Name"
+            ]
         , describe "localizeString"
             [ localizationModelTest "Missing key defaults to brackets"
                 []

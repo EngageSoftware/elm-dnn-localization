@@ -1,6 +1,6 @@
 module Engage.Localization exposing
     ( Localization
-    , decoder
+    , decoder, fromDict
     , localizeString, localizeStringWithDefault, localizeText, localizeTextWithDefault
     )
 
@@ -12,12 +12,12 @@ module Engage.Localization exposing
 @docs Localization
 
 
-# Decoders
+# Create Localization Dict
 
-@docs decoder
+@docs decoder, fromDict
 
 
-# Localization functions
+# Get localized values
 
 @docs localizeString, localizeStringWithDefault, localizeText, localizeTextWithDefault
 
@@ -29,25 +29,29 @@ import Json.Decode as Decode exposing (Decoder)
 import Maybe.Extra
 
 
-{-| `Dict` for storing Localization text
+{-| `Dict` for storing localized text
 -}
 type alias Localization =
     Dict String String
 
 
-{-| Localize a key using the given `Localization` dict. If the key is not found, this function will return the key value wrapped in `[ ]`.
+{-| Localize a key using the given `Localization` dict.
+
+If the key is not found, this function will return the key value wrapped in `[ ]`.
+The key is searched in a case-insensitive manner.
+Keys which end in `.Text` may omit that suffix.
 
     import Dict
-    import Engage.Localization exposing (Localization)
+    import Engage.Localization as Localization exposing (Localization)
 
     myLocalization : Localization
-    myLocalization = Dict.fromList [ ("FIRSTNAME.TEXT", "First Name: ") ]
+    myLocalization = Dict.fromList [ ("FirstName.Text", "First Name: ") ] |> Localization.fromDict
 
-    localizeString "FirstName.Text" { localization = myLocalization }
+    localizeString "FirstName" { localization = myLocalization }
     --> "First Name: "
 
-    localizeString "LastName.Text" { localization = myLocalization }
-    --> "[LastName.Text]"
+    localizeString "LastName" { localization = myLocalization }
+    --> "[LastName]"
 
 -}
 localizeString : String -> { a | localization : Localization } -> String
@@ -57,11 +61,14 @@ localizeString key =
 
 {-| Try to localize a key using the given `Localization` dict, and if the key is not found, return the given default value.
 
+The key is searched in a case-insensitive manner.
+Keys which end in `.Text` may omit that suffix.
+
     import Dict
-    import Engage.Localization exposing (Localization)
+    import Engage.Localization as Localization exposing (Localization)
 
     myLocalization : Localization
-    myLocalization = Dict.fromList [ ("FIRSTNAME.TEXT", "First Name: ") ]
+    myLocalization = Dict.fromList [ ("FirstName.Text", "First Name: ") ] |> Localization.fromDict
 
     localizeStringWithDefault "First Name" "FirstName.Text" { localization = myLocalization }
     --> "First Name: "
@@ -81,14 +88,14 @@ localizeStringWithDefault default key model =
         |> Maybe.withDefault default
 
 
-{-| Similar to `localizeText`, but the wrapped the text in `Html.text`
+{-| Similar to `localizeText`, but with the text wrapped in `Html.text`
 
     import Dict
-    import Engage.Localization exposing (Localization)
+    import Engage.Localization as Localization exposing (Localization)
     import Html
 
     myLocalization : Localization
-    myLocalization = Dict.fromList [ ("FIRSTNAME.TEXT", "First Name: ") ]
+    myLocalization = Dict.fromList [ ("FirstName.Text", "First Name: ") ] |> Localization.fromDict
 
     localizeText "FirstName.Text" { localization = myLocalization }
     --> Html.text "First Name: "
@@ -101,14 +108,14 @@ localizeText key =
     localizeTextWithDefault ("[" ++ key ++ "]") key
 
 
-{-| Similar to `localizeTextWithDefault`, but the wrapped the text in `Html.text`
+{-| Similar to `localizeTextWithDefault`, but with the text wrapped in `Html.text`
 
     import Dict
-    import Engage.Localization exposing (Localization)
+    import Engage.Localization as Localization exposing (Localization)
     import Html
 
     myLocalization : Localization
-    myLocalization = Dict.fromList [ ("FIRSTNAME.TEXT", "First Name: ") ]
+    myLocalization = Dict.fromList [ ("FirstName.Text", "First Name: ") ] |> Localization.fromDict
 
     localizeTextWithDefault "First Name" "FirstName.Text" { localization = myLocalization }
     --> Html.text "First Name: "
@@ -142,24 +149,24 @@ Supports three formats:
         }
 
     """ [ { "key": "FirstName.Text", "value": "First Name:" } ] """
-    |> Decode.decodeString decoder
-    |> Result.withDefault Dict.empty
-    |> Model
-    |> localizeString "FirstName"
+        |> Decode.decodeString decoder
+        |> Result.withDefault Dict.empty
+        |> Model
+        |> localizeString "FirstName"
     --> "First Name:"
 
     """ [ { "Key": "LastName.Text", "Value": "Last Name:" } ] """
-    |> Decode.decodeString decoder
-    |> Result.withDefault Dict.empty
-    |> Model
-    |> localizeString "lastname"
+        |> Decode.decodeString decoder
+        |> Result.withDefault Dict.empty
+        |> Model
+        |> localizeString "lastname"
     --> "Last Name:"
 
     """ { "FirstName.Text": "Given Name", "FirstName.Help": "Your given name" } """
-    |> Decode.decodeString decoder
-    |> Result.withDefault Dict.empty
-    |> Model
-    |> localizeString "FirstName.Help"
+        |> Decode.decodeString decoder
+        |> Result.withDefault Dict.empty
+        |> Model
+        |> localizeString "FirstName.Help"
     --> "Your given name"
 ```
 
@@ -167,12 +174,6 @@ Supports three formats:
 decoder : Decoder Localization
 decoder =
     let
-        keyValuesToLocalization : List ( String, String ) -> Localization
-        keyValuesToLocalization keyValues =
-            keyValues
-                |> List.map (\( key, value ) -> ( String.toUpper key, value ))
-                |> Dict.fromList
-
         keyValueDecoder : Decoder (List ( String, String ))
         keyValueDecoder =
             Decode.map2 (\key value -> ( key, value ))
@@ -186,4 +187,36 @@ decoder =
                 |> Decode.map Dict.toList
     in
     Decode.oneOf [ keyValueDecoder, objectDecoder ]
-        |> Decode.map keyValuesToLocalization
+        |> Decode.map fromKeyValuePairs
+
+
+{-| Convert a dictionary to a `Localization`.
+
+This normalizes the data in the dictionary (i.e. it is not the same as just using a `Dict String String` directly).
+
+    import Dict
+    import Engage.Localization as Localization
+
+    type alias Model =
+        { localization : Localization
+        }
+
+    Dict.fromList [ ("FirstName.Text", "First Name:") ]
+        |> Localization.fromDict
+        |> Model
+        |> Localization.localizeString "FirstName"
+    --> "First Name:"
+
+-}
+fromDict : Dict String String -> Localization
+fromDict dict =
+    dict
+        |> Dict.toList
+        |> fromKeyValuePairs
+
+
+fromKeyValuePairs : List ( String, String ) -> Localization
+fromKeyValuePairs pairs =
+    pairs
+        |> List.map (\( key, value ) -> ( String.toUpper key, value ))
+        |> Dict.fromList
