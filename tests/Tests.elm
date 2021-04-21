@@ -162,6 +162,7 @@ localizationModelTest description entries getValue expectation =
 localizeEntries : List ( String, String ) -> Localization -> List ( String, String )
 localizeEntries entries localization =
     let
+        model : Model
         model =
             Model localization
     in
@@ -173,6 +174,7 @@ localizeEntries entries localization =
 encodeEntriesAsLowerCaseList : List ( String, String ) -> Encode.Value
 encodeEntriesAsLowerCaseList entries =
     let
+        encodeEntry : ( String, String ) -> Encode.Value
         encodeEntry ( key, value ) =
             Encode.object [ ( "key", Encode.string key ), ( "value", Encode.string value ) ]
     in
@@ -183,6 +185,7 @@ encodeEntriesAsLowerCaseList entries =
 encodeEntriesAsUpperCaseList : List ( String, String ) -> Encode.Value
 encodeEntriesAsUpperCaseList entries =
     let
+        encodeEntry : ( String, String ) -> Encode.Value
         encodeEntry ( key, value ) =
             Encode.object [ ( "Key", Encode.string key ), ( "Value", Encode.string value ) ]
     in
@@ -193,6 +196,7 @@ encodeEntriesAsUpperCaseList entries =
 encodeEntriesAsObject : List ( String, String ) -> Encode.Value
 encodeEntriesAsObject entries =
     let
+        encodeEntry : ( String, String ) -> ( String, Encode.Value )
         encodeEntry ( key, value ) =
             ( key, Encode.string value )
     in
@@ -204,9 +208,11 @@ encodeEntriesAsObject entries =
 entriesFuzzer : Fuzzer (List ( String, String ))
 entriesFuzzer =
     let
+        entryFuzzer : Fuzzer ( String, String )
         entryFuzzer =
             Fuzz.tuple ( Fuzz.string, Fuzz.string )
 
+        removeDuplicates : List ( String, String ) -> List ( String, String )
         removeDuplicates entries =
             entries
                 |> List.Extra.gatherEqualsBy (Tuple.first >> String.toUpper)

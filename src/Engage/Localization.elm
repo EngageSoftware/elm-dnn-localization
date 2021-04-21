@@ -79,6 +79,7 @@ Keys which end in `.Text` may omit that suffix.
 localizeStringWithDefault : String -> String -> { a | localization : Localization } -> String
 localizeStringWithDefault default key model =
     let
+        keyUppercase : String
         keyUppercase =
             String.toUpper key
     in
