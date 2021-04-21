@@ -1,7 +1,7 @@
 module Tests exposing (suite)
 
-import Dict exposing (Dict)
-import Engage.Localization as Localization
+import Dict
+import Engage.Localization as Localization exposing (Localization)
 import Expect
 import Fuzz exposing (Fuzzer)
 import Json.Decode as Decode
@@ -20,11 +20,48 @@ suite =
                     "[]"
                         |> Decode.decodeString Localization.decoder
                         |> Expect.equal (Ok Dict.empty)
-            , fuzz entriesFuzzer "Decode entries" <|
+            , test "Array with single object with key and value" <|
+                \_ ->
+                    """[{"key":"Name.Text","value":"Title"}]"""
+                        |> Decode.decodeString Localization.decoder
+                        |> Result.withDefault Dict.empty
+                        |> (\localization -> { localization = localization })
+                        |> Localization.localizeString "Name"
+                        |> Expect.equal "Title"
+            , test "Array with single object with Key and Value" <|
+                \_ ->
+                    """[{"Key":"Name.Text","Value":"Title"}]"""
+                        |> Decode.decodeString Localization.decoder
+                        |> Result.withDefault Dict.empty
+                        |> (\localization -> { localization = localization })
+                        |> Localization.localizeString "Name"
+                        |> Expect.equal "Title"
+            , test "Object with properties" <|
+                \_ ->
+                    """{"Name.Text":"Title"}"""
+                        |> Decode.decodeString Localization.decoder
+                        |> Result.withDefault Dict.empty
+                        |> (\localization -> { localization = localization })
+                        |> Localization.localizeString "Name"
+                        |> Expect.equal "Title"
+            , fuzz entriesFuzzer "Decode entries from [{key,value},…] format" <|
                 \entries ->
-                    localizationTest entries
+                    localizationTest
+                        (encodeEntriesAsLowerCaseList entries)
                         (localizeEntries entries)
-                        (Expect.equalDicts (Dict.fromList entries))
+                        (Expect.equalLists entries)
+            , fuzz entriesFuzzer "Decode entries from [{Key,Value},…] format" <|
+                \entries ->
+                    localizationTest
+                        (encodeEntriesAsLowerCaseList entries)
+                        (localizeEntries entries)
+                        (Expect.equalLists entries)
+            , fuzz entriesFuzzer "Decode entries from {key:value,…} format" <|
+                \entries ->
+                    localizationTest
+                        (encodeEntriesAsLowerCaseList entries)
+                        (localizeEntries entries)
+                        (Expect.equalLists entries)
             ]
         , describe "localizeString"
             [ localizationModelTest "Missing key defaults to brackets"
@@ -43,9 +80,9 @@ suite =
         ]
 
 
-localizationTest entries getValue expectation =
-    entries
-        |> encodeEntries
+localizationTest : Encode.Value -> (Localization -> a) -> (a -> Expect.Expectation) -> Expect.Expectation
+localizationTest encodedEntries getValue expectation =
+    encodedEntries
         |> Decode.decodeValue Localization.decoder
         |> Result.map getValue
         |> Result.map expectation
@@ -54,35 +91,80 @@ localizationTest entries getValue expectation =
         |> Result.Extra.merge
 
 
+type alias Model =
+    { localization : Localization
+    }
+
+
+localizationModelTest : String -> List ( String, String ) -> (Model -> a) -> (a -> Expect.Expectation) -> Test
 localizationModelTest description entries getValue expectation =
-    test description <|
-        \_ ->
-            localizationTest
-                entries
-                (\localization -> getValue { localization = localization })
-                expectation
+    let
+        wrapLocalization : Localization -> a
+        wrapLocalization localization =
+            getValue (Model localization)
+    in
+    describe description
+        [ test (description ++ " [{key,value},…] encoding") <|
+            \_ ->
+                localizationTest
+                    (encodeEntriesAsLowerCaseList entries)
+                    wrapLocalization
+                    expectation
+        , test (description ++ " [{Key,Value},…] encoding") <|
+            \_ ->
+                localizationTest
+                    (encodeEntriesAsUpperCaseList entries)
+                    wrapLocalization
+                    expectation
+        , test (description ++ " {key:value,…} encoding") <|
+            \_ ->
+                localizationTest
+                    (encodeEntriesAsObject entries)
+                    wrapLocalization
+                    expectation
+        ]
 
 
-localizeEntries : List ( String, String ) -> Localization.Localization -> Dict String String
+localizeEntries : List ( String, String ) -> Localization -> List ( String, String )
 localizeEntries entries localization =
     let
         model =
-            { localization = localization }
+            Model localization
     in
     entries
         |> List.map Tuple.first
         |> List.map (\key -> ( key, Localization.localizeString key model ))
-        |> Dict.fromList
 
 
-encodeEntries : List ( String, String ) -> Encode.Value
-encodeEntries entries =
+encodeEntriesAsLowerCaseList : List ( String, String ) -> Encode.Value
+encodeEntriesAsLowerCaseList entries =
     let
         encodeEntry ( key, value ) =
             Encode.object [ ( "key", Encode.string key ), ( "value", Encode.string value ) ]
     in
     entries
         |> Encode.list encodeEntry
+
+
+encodeEntriesAsUpperCaseList : List ( String, String ) -> Encode.Value
+encodeEntriesAsUpperCaseList entries =
+    let
+        encodeEntry ( key, value ) =
+            Encode.object [ ( "Key", Encode.string key ), ( "Value", Encode.string value ) ]
+    in
+    entries
+        |> Encode.list encodeEntry
+
+
+encodeEntriesAsObject : List ( String, String ) -> Encode.Value
+encodeEntriesAsObject entries =
+    let
+        encodeEntry ( key, value ) =
+            ( key, Encode.string value )
+    in
+    entries
+        |> List.map encodeEntry
+        |> Encode.object
 
 
 entriesFuzzer : Fuzzer (List ( String, String ))

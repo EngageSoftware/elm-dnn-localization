@@ -121,8 +121,17 @@ localizeTextWithDefault default key model =
     Html.text (localizeStringWithDefault default key model)
 
 
-{-| Decode from JSON values that contains an array of object with `key` and `value` string properties to a `Localization`
+{-| Decode from JSON values to a `Localization`.
 
+Supports three formats:
+
+  - an array of object with `key` and `value` string properties
+
+  - an array of object with `Key` and `Value` string properties
+
+  - an object with string properties
+
+```
     import Dict
     import Engage.Localization exposing (Localization)
     import Json.Decode as Decode
@@ -133,28 +142,48 @@ localizeTextWithDefault default key model =
         }
 
     """ [ { "key": "FirstName.Text", "value": "First Name:" } ] """
-        |> Decode.decodeString decoder
-        |> Result.withDefault Dict.empty
-        |> Model
-        |> localizeString "FirstName"
+    |> Decode.decodeString decoder
+    |> Result.withDefault Dict.empty
+    |> Model
+    |> localizeString "FirstName"
     --> "First Name:"
+
+    """ [ { "Key": "LastName.Text", "Value": "Last Name:" } ] """
+    |> Decode.decodeString decoder
+    |> Result.withDefault Dict.empty
+    |> Model
+    |> localizeString "lastname"
+    --> "Last Name:"
+
+    """ { "FirstName.Text": "Given Name", "FirstName.Help": "Your given name" } """
+    |> Decode.decodeString decoder
+    |> Result.withDefault Dict.empty
+    |> Model
+    |> localizeString "FirstName.Help"
+    --> "Your given name"
+```
 
 -}
 decoder : Decoder Localization
 decoder =
-    Decode.list keyValueDecoder
+    let
+        keyValuesToLocalization : List ( String, String ) -> Localization
+        keyValuesToLocalization keyValues =
+            keyValues
+                |> List.map (\( key, value ) -> ( String.toUpper key, value ))
+                |> Dict.fromList
+
+        keyValueDecoder : Decoder (List ( String, String ))
+        keyValueDecoder =
+            Decode.map2 (\key value -> ( key, value ))
+                (Decode.oneOf [ Decode.field "key" Decode.string, Decode.field "Key" Decode.string ])
+                (Decode.oneOf [ Decode.field "value" Decode.string, Decode.field "Value" Decode.string ])
+                |> Decode.list
+
+        objectDecoder : Decoder (List ( String, String ))
+        objectDecoder =
+            Decode.dict Decode.string
+                |> Decode.map Dict.toList
+    in
+    Decode.oneOf [ keyValueDecoder, objectDecoder ]
         |> Decode.map keyValuesToLocalization
-
-
-keyValuesToLocalization : List ( String, String ) -> Localization
-keyValuesToLocalization keyValues =
-    keyValues
-        |> List.map (\( key, value ) -> ( String.toUpper key, value ))
-        |> Dict.fromList
-
-
-keyValueDecoder : Decoder ( String, String )
-keyValueDecoder =
-    Decode.map2 (\key value -> ( key, value ))
-        (Decode.field "key" Decode.string)
-        (Decode.field "value" Decode.string)
