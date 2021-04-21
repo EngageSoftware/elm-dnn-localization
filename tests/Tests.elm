@@ -91,6 +91,12 @@ suite =
                         |> Localization.localizeStringWithDefault "Not Found" "Name"
                         |> Expect.equal "The Name"
             ]
+        , describe "empty"
+            [ test "Empty Localization is empty dict" <|
+                \_ ->
+                    Localization.empty
+                        |> Expect.equalDicts Dict.empty
+            ]
         , describe "localizeString"
             [ localizationModelTest "Missing key defaults to brackets"
                 []

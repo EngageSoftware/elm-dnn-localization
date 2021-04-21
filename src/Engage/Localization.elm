@@ -1,6 +1,6 @@
 module Engage.Localization exposing
     ( Localization
-    , decoder, fromDict
+    , decoder, fromDict, empty
     , localizeString, localizeStringWithDefault, localizeText, localizeTextWithDefault
     )
 
@@ -14,7 +14,7 @@ module Engage.Localization exposing
 
 # Create Localization Dict
 
-@docs decoder, fromDict
+@docs decoder, fromDict, empty
 
 
 # Get localized values
@@ -213,6 +213,28 @@ fromDict dict =
     dict
         |> Dict.toList
         |> fromKeyValuePairs
+
+
+{-| Creates an empty `Localization`.
+
+    import Engage.Localization as Localization
+
+    type alias Model =
+        { localization : Localization
+        }
+
+    initialModel : Model
+    initialModel =
+        Model Localization.empty
+
+    initialModel
+        |> Localization.localizeString "FirstName"
+    --> "[FirstName]"
+
+-}
+empty : Localization
+empty =
+    fromDict Dict.empty
 
 
 fromKeyValuePairs : List ( String, String ) -> Localization
