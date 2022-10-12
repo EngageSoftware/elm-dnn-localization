@@ -210,7 +210,7 @@ entriesFuzzer =
     let
         entryFuzzer : Fuzzer ( String, String )
         entryFuzzer =
-            Fuzz.tuple ( Fuzz.string, Fuzz.string )
+            Fuzz.pair Fuzz.string Fuzz.string
 
         removeDuplicates : List ( String, String ) -> List ( String, String )
         removeDuplicates entries =
